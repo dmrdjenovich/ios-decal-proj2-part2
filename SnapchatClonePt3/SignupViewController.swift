@@ -39,7 +39,27 @@ class SignupViewController: UIViewController, UITextFieldDelegate {
         guard let password = passwordField.text else { return }
         guard let name = nameField.text else { return }
         
-        // YOUR CODE HERE
+        FIRAuth.auth()?.createUser(withEmail: email, password: password, completion: {(user,error) in
+            if (error == nil && user != nil) {
+                let changeReq = user!.profileChangeRequest();
+                changeReq.displayName = name;
+                changeReq.commitChanges(completion: {(err) in
+                    if (err != nil) {
+                        let alert = UIAlertController(title: "Signup Error", message: "Error Updating Database", preferredStyle: .alert);
+                        alert.addAction(UIAlertAction(title: "Dismiss", style: UIAlertActionStyle.default,handler: nil));
+                        self.present(alert, animated: false, completion: nil);
+                    }
+                    else {
+                        self.performSegue(withIdentifier: "signupToMain", sender: nil);
+                    }
+                })
+            }
+            else {
+                let alert = UIAlertController(title: "Signup Error", message: "Password must be 6 Characters", preferredStyle: .alert);
+                alert.addAction(UIAlertAction(title: "Dismiss", style: UIAlertActionStyle.default,handler: nil));
+                self.present(alert, animated: false, completion: nil);
+            }
+            })
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {

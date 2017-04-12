@@ -51,7 +51,9 @@ class PostsTableViewController: UIViewController, UITableViewDelegate, UITableVi
         (Hint): This should be pretty simple.
     */
     override func viewWillAppear(_ animated: Bool) {
-        // YOUR CODE HERE
+        updateData();
+        print("Updated");
+        print(threads);
     }
 
     override func didReceiveMemoryWarning() {
@@ -71,7 +73,29 @@ class PostsTableViewController: UIViewController, UITableViewDelegate, UITableVi
      
     */
     func updateData() {
-        // YOUR CODE HERE
+        getPosts(user: currentUser, completion: {
+            (posts) in
+            clearThreads();
+            if posts == nil {
+                self.postTableView.reloadData();
+                print("Found No Posts / Error");
+                return;
+            }
+            for post in posts! {
+                addPostToThread(post: post);
+                var img : UIImage? = nil;
+                getDataFromPath(path: post.postImagePath, completion: {
+                    (a:Data?) in
+                    if a != nil {
+                        img = UIImage(data: a!);
+                        self.loadedImagesById[post.postId] = img!;
+                    }
+                });
+                
+            }
+            self.postTableView.reloadData();
+            print("Data Updated Completion Handler");
+        });
     }
     
     // MARK: Custom methods (relating to UI)
@@ -143,9 +167,7 @@ class PostsTableViewController: UIViewController, UITableViewDelegate, UITableVi
         if let post = getPostFromIndexPath(indexPath: indexPath), !post.read {
             presentPostImage(forPost: post)
             post.read = true
-            
-            // YOUR CODE HERE
-            
+            currentUser.addNewReadPost(postID: post.postId);
             tableView.reloadRows(at: [indexPath], with: .automatic)
         }
      

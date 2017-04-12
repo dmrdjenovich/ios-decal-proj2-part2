@@ -1,3 +1,4 @@
+
 //
 //  imageFeed.swift
 //  snapChatProject
@@ -59,8 +60,15 @@ func addPost(postImage: UIImage, thread: String, username: String) {
     let dbRef = FIRDatabase.database().reference()
     let data = UIImageJPEGRepresentation(postImage, 1.0)! 
     let path = "\(firStorageImagesPath)/\(UUID().uuidString)"
-    
-    // YOUR CODE HERE
+    let date : String = {
+        let df = DateFormatter();
+        df.dateFormat = dateFormat;
+        return df.string(from:Date());
+    }();
+    let toStore : [String:AnyObject] = ["date": (date as! AnyObject), "imagePath": (path as! AnyObject), "thread": (thread as! AnyObject),"username": (username as! AnyObject)];
+    let newNode = dbRef.child(firPostsNode).childByAutoId();
+    newNode.setValue(toStore);
+    store(data: UIImagePNGRepresentation(postImage)!, toPath: path);
 }
 
 /*
@@ -73,8 +81,12 @@ func addPost(postImage: UIImage, thread: String, username: String) {
 */
 func store(data: Data, toPath path: String) {
     let storageRef = FIRStorage.storage().reference()
-    
-    // YOUR CODE HERE
+    storageRef.child(path).put(data, metadata: nil) {
+        (metadata,error) in
+        if (error != nil) {
+            print("Error Uploading Image");
+        }
+    }
 }
 
 
@@ -98,11 +110,55 @@ func store(data: Data, toPath path: String) {
 func getPosts(user: CurrentUser, completion: @escaping ([Post]?) -> Void) {
     let dbRef = FIRDatabase.database().reference()
     var postArray: [Post] = []
-    
-    // YOUR CODE HERE
+    dbRef.child(firPostsNode).observeSingleEvent(of: .value, with: {
+        (snapshot) in
+        if (!snapshot.exists() || snapshot.value == nil) {
+            completion(nil);
+            return;
+        }
+        let postDict = snapshot.value as! [String:AnyObject];
+        dbRef.child(firUsersNode).child(user.id!).child(firReadPostsNode).observeSingleEvent(of: .value, with: {
+            (snapshot2) in
+            var readDict : [String:AnyObject]? = nil;
+            if (snapshot2.exists() && snapshot2.value != nil) {
+                readDict = snapshot2.value as! [String:AnyObject];
+            }
+            /*
+            if (!snapshot2.exists()) {
+                completion(nil);
+                return;
+            }
+            if (snapshot2.value == nil) {
+                completion(nil);
+                return;
+            }
+            */
+            for (k,v) in postDict {
+                print("breaking");
+                let readStatus : Bool = {
+                    if (readDict == nil) { return false; }
+                    if (readDict!.contains(where: {
+                        (key:String,value:AnyObject) in
+                        return (k as! String) == (value as! String);
+                    })) {
+                        return true;
+                    }
+                    return false;
+                }();
+                let props = v as! [String:AnyObject];
+                guard let usnm = props["username"] as? String else {continue}
+                guard let path = props["imagePath"] as? String else {continue}
+                guard let thread = props["thread"] as? String else {continue}
+                guard let date = props["date"] as? String else {continue}
+                let post = Post(id: k, username: usnm, postImagePath: path, thread: thread, dateString: date, read: readStatus);
+                postArray.append(post);
+            }
+            completion(postArray);
+        });
+    });
 }
 
-func getDataFromPath(path: String, completion: @escaping (Data?) -> Void) {
+func getDataFromPath(path: String, completion: @escaping (Data?) -> Void){
     let storageRef = FIRStorage.storage().reference()
     storageRef.child(path).data(withMaxSize: 5 * 1024 * 1024) { (data, error) in
         if let error = error {
